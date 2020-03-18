@@ -200,11 +200,24 @@ pocChains:
     colorHex: "#05aba4"
     isLhd: true
 
+#------------------------   AETH   ------------------------#
+
+# AETH via HDPool CO Pool (Direct - no other applications needed)
+  - name: AETH - HDPool CO [Direct]
+    enabled: false
+    priority: 2
+    colorHex: "#ffffff"
+  # Your HDPool account key goes here:
+    accountKey: abcdefg-abcdefg-abcdefg-abcdefg
+    isHdpool: true
+    isAeth: true
+#    minerName: My Miner
+
 #------------------------   BOOMCOIN   ------------------------#
 
 # Boom Pool mining via boom.voiplanparty.com
   - name: BOOM [VLP]
-    priority: 2
+    priority: 3
     url: "http://boom.voiplanparty.com"
     colorHex: "#aaaaaa"
     isPool: true
@@ -212,7 +225,7 @@ pocChains:
 # Boom Solo mining
 #  (You must have a Boom wallet running on the same machine as Archon with these settings!)
   - name: BOOM [Solo]
-    priority: 2
+    priority: 3
     url: "http://localhost:9925" # default boom wallet port, if you changed the wallet port you'll need to change it here too
     colorHex: "#aaaaaa"
     isBoomcoin: true
@@ -225,7 +238,7 @@ pocChains:
 
 # BURST Pool mining via voiplanparty.com
   - name: BURST [VLP]
-    priority: 3
+    priority: 4
     url: "http://voiplanparty.com:8124"
     colorHex: "#00579D"
     isPool: true
@@ -233,7 +246,7 @@ pocChains:
 # Burst Solo mining
 #  (You must have a Burst wallet running on the same machine as Archon with these settings!)
   - name: BURST [Solo]
-    priority: 3
+    priority: 4
     url: "http://localhost:8125"
     colorHex: "#00579D"
     numericIdToPassphrase:
@@ -296,6 +309,9 @@ If you need more control over your chains, you can add any of these parameters t
 - `isLhd` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is for mining LHD/LTCHD/LitecoinHD.
+- `isAeth` *`Boolean`*
+  - Optional. Default = false
+  - Set to true if the chain is for mining AMUN Ethereum/AETH.
 - `isPool` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is mining via a pool. *Not required if any of `isHpool`, `isHdpool` or `isHdpoolEco` are set to `true`.*

@@ -23,9 +23,9 @@ pub mod config;
 pub mod upstream;
 pub mod web;
 pub mod error;
-use crate::config::Config;
-use crate::config::PocChain;
-use crate::upstream::MiningInfo;
+use config::Config;
+use config::PocChain;
+use upstream::MiningInfo;
 use arbiter::HDPoolSubmitNonceInfo;
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
@@ -64,6 +64,7 @@ lazy_static! {
     };
     static ref HDPOOL_SUBMIT_NONCE_SENDER_BHD: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     static ref HDPOOL_SUBMIT_NONCE_SENDER_LHD: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
+    static ref HDPOOL_SUBMIT_NONCE_SENDER_AETH: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     // Key = block height, Value = tuple (account_id, best_deadline)
     static ref BEST_DEADLINES: Arc<Mutex<HashMap<u32, Vec<(u64, u64)>>>> = {
         let best_deadlines = HashMap::new();
@@ -233,6 +234,7 @@ fn main() {
                     && (chain.is_pool.unwrap_or_default()
                         || chain.is_bhd.unwrap_or_default()
                         || chain.is_lhd.unwrap_or_default()
+                        || chain.is_aeth.unwrap_or_default()
                         || !chain.enabled.unwrap_or(true))
                 {
                     if unused_passphrase_warnings.len() > 0 {
@@ -247,6 +249,8 @@ fn main() {
                         unused_passphrase_warnings.push_str(" (CHAIN IS BHD)");
                     } else if chain.is_lhd.unwrap_or_default() {
                         unused_passphrase_warnings.push_str(" (CHAIN IS LHD)");
+                    } else if chain.is_aeth.unwrap_or_default() {
+                        unused_passphrase_warnings.push_str(" (CHAIN IS AETH)");
                     }
                 }
                 if chain.enabled.unwrap_or(true) {
@@ -1020,6 +1024,7 @@ fn print_block_started(
         let mut human_readable_target_deadline = String::from("");
         let is_bhd = current_chain.is_bhd.unwrap_or_default();
         let is_lhd = current_chain.is_lhd.unwrap_or_default();
+        let is_aeth = current_chain.is_aeth.unwrap_or_default();
         match get_target_deadline(None, base_target, chain_index, Some(current_chain.clone())) {
             TargetDeadlineType::ConfigChainLevel(chain_tdl) => {
                 if crate::CONF.show_human_readable_deadlines.unwrap_or_default() {
@@ -1082,6 +1087,15 @@ fn print_block_started(
                 format!("  {}   {}\n",
                     chain_color.bold().paint("Network Difficulty:"),
                     chain_color.paint(format!("{} ({})", net_difficulty_fmt, lhd_net_difficulty_fmt))
+                ).as_str(),
+            );
+        } else if is_aeth {
+            let aeth_net_diff = get_network_difficulty_for_block(base_target, 300);
+            let aeth_net_difficulty_fmt = fmt_capacity(aeth_net_diff, None);
+            new_block_message.push_str(
+                format!("  {}   {}\n",
+                    chain_color.bold().paint("Network Difficulty:"),
+                    chain_color.paint(format!("{} ({})", net_difficulty_fmt, aeth_net_difficulty_fmt))
                 ).as_str(),
             );
         } else {
@@ -1392,6 +1406,7 @@ fn get_chain_from_index(index: u8) -> PocChain {
         priority: 0,
         is_bhd: None,
         is_lhd: None,
+        is_aeth: None,
         is_boomcoin: None,
         is_pool: None,
         is_hpool: None,

@@ -144,7 +144,11 @@ fn thread_handle_hdpool_nonce_submissions(
     let account_key = chain.account_key.clone().unwrap_or(String::from(""));
     let coin = match chain.is_lhd.unwrap_or_default() {
         true => String::from("LHD"),
-        _ => String::from("BHD"),
+        false =>
+            match chain.is_aeth.unwrap_or_default() {
+                true => String::from("AETH"),
+                false => String::from("BHD")
+            }
     };
     loop {
         let ks = match ks_rx.try_recv() {
@@ -224,7 +228,12 @@ fn thread_hdpool_websocket(
         let account_key = chain.account_key.clone().unwrap_or(String::from(""));
         let coin = match chain.is_lhd.unwrap_or_default() {
             true => "LHD",
-            _ => "BHD",
+            false => {
+                match chain.is_aeth.unwrap_or_default() {
+                    true => "AETH",
+                    false => "BHD",
+                }
+            },
         };
         let mut miner_name = match chain.miner_name.clone() {
             Some(miner_name) => {
@@ -296,6 +305,9 @@ fn thread_hdpool_websocket(
                             r#"{"cmd":"poolmgr.heartbeat","mark":"bhd"}"# => {
                                 trace!("BHD Heartbeat acknowledged.");
                             },
+                            r#"{"cmd":"poolmgr.heartbeat","mark":"aeth"}"# => {
+                                trace!("AETH Heartbeat acknowledged.");
+                            },
                             _ => {
                                 debug!("HDPool WebSocket: Received:\n    {}", message);
                                 if coin == "LHD" && (
@@ -311,6 +323,21 @@ fn thread_hdpool_websocket(
                                         }
                                         Err(why) => {
                                             warn!("HDP-WS: Couldn't send LHD mining info through channel: {}", why);
+                                        }
+                                    }
+                                } else if coin == "AETH" && (
+                                    message_str.to_lowercase().starts_with(r#"{"cmd":"mining_info","mark":"aeth","para":"#,) ||
+                                    message_str.to_lowercase().starts_with(r#"{"cmd":"poolmgr.mining_info","mark":"aeth","para":"#)
+                                ) {
+                                    let parsed_message_str: serde_json::Value = serde_json::from_str(&message_str).unwrap();
+                                    let mining_info = parsed_message_str["para"].to_string().clone();
+                                    debug!("HDPool WebSocket: NEW AETH BLOCK: {}", mining_info);
+                                    match mining_info_sender.send(mining_info) {
+                                        Ok(_) => {
+                                            debug!("Sent AETH mining info through channel successfully.");
+                                        }
+                                        Err(why) => {
+                                            warn!("HDP-WS: Couldn't send AETH mining info through channel: {}", why);
                                         }
                                     }
                                 } else if coin == "BHD" && (
@@ -402,6 +429,9 @@ fn thread_get_mining_info(
             // set global submit nonce sender so it can be accessed from nonce submission handler code
             if chain_copy.is_lhd.unwrap_or_default() {
                 *crate::HDPOOL_SUBMIT_NONCE_SENDER_LHD.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
+                thread_hdpool_websocket(chain_copy, hdpool_mining_info_sender.clone(), hdpool_nonce_submission_receiver);
+            } else if chain_copy.is_aeth.unwrap_or_default() {
+                *crate::HDPOOL_SUBMIT_NONCE_SENDER_AETH.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
                 thread_hdpool_websocket(chain_copy, hdpool_mining_info_sender.clone(), hdpool_nonce_submission_receiver);
             } else {
                 *crate::HDPOOL_SUBMIT_NONCE_SENDER_BHD.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
@@ -1262,6 +1292,7 @@ pub fn process_nonce_submission(
                     && !current_chain.is_pool.unwrap_or_default()
                     && !current_chain.is_bhd.unwrap_or_default()
                     && !current_chain.is_lhd.unwrap_or_default()
+                    && !current_chain.is_aeth.unwrap_or_default()
                 {
                     let mut passphrase_set = false;
                     match current_chain.clone().numeric_id_to_passphrase {
@@ -1301,7 +1332,10 @@ pub fn process_nonce_submission(
                                 // get sender
                                 let sender = match current_chain.is_lhd.unwrap_or_default() {
                                     true => crate::HDPOOL_SUBMIT_NONCE_SENDER_LHD.lock().unwrap(),
-                                    _ => crate::HDPOOL_SUBMIT_NONCE_SENDER_BHD.lock().unwrap()
+                                    false => match current_chain.is_aeth.unwrap_or_default() {
+                                                true => crate::HDPOOL_SUBMIT_NONCE_SENDER_AETH.lock().unwrap(),
+                                                false => crate::HDPOOL_SUBMIT_NONCE_SENDER_BHD.lock().unwrap(),
+                                             }
                                 };
                                 if sender.is_some() {
                                     let sender = sender.clone().unwrap();
@@ -1344,6 +1378,7 @@ pub fn process_nonce_submission(
                                     || current_chain.is_hpool.unwrap_or_default()
                                     || current_chain.is_bhd.unwrap_or_default()
                                     || current_chain.is_lhd.unwrap_or_default()
+                                    || current_chain.is_aeth.unwrap_or_default()
                                     || current_chain.is_pool.unwrap_or_default() {
                                     if current_chain.is_boomcoin.unwrap_or(false) {
                                         url.push_str(format!("/boom?requestType=submitNonce&blockheight={}&accountId={}&nonce={}&deadline={}",
@@ -1531,6 +1566,7 @@ pub fn process_nonce_submission(
                     && !current_chain.is_hpool.unwrap_or_default()
                     && !current_chain.is_pool.unwrap_or_default()
                     && !current_chain.is_lhd.unwrap_or_default()
+                    && !current_chain.is_aeth.unwrap_or_default()
                     && !current_chain.is_bhd.unwrap_or_default() {
                     let resp = SubmitNonceResponse{
                         result: String::from("failure"),
