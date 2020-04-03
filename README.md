@@ -213,6 +213,19 @@ pocChains:
     isAeth: true
 #    minerName: My Miner
 
+#------------------------   DISC   ------------------------#
+
+# DISC via HDPool CO Pool (Direct - no other applications needed)
+  - name: DISC - HDPool CO [Direct]
+    enabled: false
+    priority: 3
+    colorHex: "#ff00ff"
+  # Your HDPool account key goes here:
+    accountKey: abcdefg-abcdefg-abcdefg-abcdefg
+    isHdpool: true
+    isDisc: true
+#    minerName: My Miner
+
 #------------------------   BOOMCOIN   ------------------------#
 
 # Boom Pool mining via boom.voiplanparty.com
@@ -312,6 +325,9 @@ If you need more control over your chains, you can add any of these parameters t
 - `isAeth` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is for mining AMUN Ethereum/AETH.
+- `isDisc` *`Boolean`*
+  - Optional. Default = false
+  - Set to true if the chain is for mining Diskcoin/DISC.
 - `isPool` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is mining via a pool. *Not required if any of `isHpool`, `isHdpool` or `isHdpoolEco` are set to `true`.*

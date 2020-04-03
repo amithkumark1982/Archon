@@ -65,6 +65,7 @@ lazy_static! {
     static ref HDPOOL_SUBMIT_NONCE_SENDER_BHD: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     static ref HDPOOL_SUBMIT_NONCE_SENDER_LHD: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     static ref HDPOOL_SUBMIT_NONCE_SENDER_AETH: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
+    static ref HDPOOL_SUBMIT_NONCE_SENDER_DISC: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     // Key = block height, Value = tuple (account_id, best_deadline)
     static ref BEST_DEADLINES: Arc<Mutex<HashMap<u32, Vec<(u64, u64)>>>> = {
         let best_deadlines = HashMap::new();
@@ -235,6 +236,7 @@ fn main() {
                         || chain.is_bhd.unwrap_or_default()
                         || chain.is_lhd.unwrap_or_default()
                         || chain.is_aeth.unwrap_or_default()
+                        || chain.is_disc.unwrap_or_default()
                         || !chain.enabled.unwrap_or(true))
                 {
                     if unused_passphrase_warnings.len() > 0 {
@@ -251,6 +253,8 @@ fn main() {
                         unused_passphrase_warnings.push_str(" (CHAIN IS LHD)");
                     } else if chain.is_aeth.unwrap_or_default() {
                         unused_passphrase_warnings.push_str(" (CHAIN IS AETH)");
+                    } else if chain.is_disc.unwrap_or_default() {
+                        unused_passphrase_warnings.push_str(" (CHAIN IS DISC)");
                     }
                 }
                 if chain.enabled.unwrap_or(true) {
@@ -657,7 +661,7 @@ fn uppercase_first(s: &str) -> String {
 }*/
 
 /* I'm not entirely sure this has been modified properly, so I'm leaving the original commented out
-   above, just in case this doesn't really work well. */
+above, just in case this doesn't really work well. */
 fn get_color(chain: PocChain) -> Colour {
     // if using poc chain colors is disabled in config, return white here
     if !crate::CONF.use_poc_chain_colors.unwrap_or(true) {
@@ -1025,6 +1029,7 @@ fn print_block_started(
         let is_bhd = current_chain.is_bhd.unwrap_or_default();
         let is_lhd = current_chain.is_lhd.unwrap_or_default();
         let is_aeth = current_chain.is_aeth.unwrap_or_default();
+        let is_disc = current_chain.is_disc.unwrap_or_default();
         match get_target_deadline(None, base_target, chain_index, Some(current_chain.clone())) {
             TargetDeadlineType::ConfigChainLevel(chain_tdl) => {
                 if crate::CONF.show_human_readable_deadlines.unwrap_or_default() {
@@ -1096,6 +1101,15 @@ fn print_block_started(
                 format!("  {}   {}\n",
                     chain_color.bold().paint("Network Difficulty:"),
                     chain_color.paint(format!("{} ({})", net_difficulty_fmt, aeth_net_difficulty_fmt))
+                ).as_str(),
+            );
+        } else if is_disc {
+            let disc_net_diff = get_network_difficulty_for_block(base_target, 240);
+            let disc_net_difficulty_fmt = fmt_capacity(disc_net_diff, None);
+            new_block_message.push_str(
+                format!("  {}   {}\n",
+                    chain_color.bold().paint("Network Difficulty:"),
+                    chain_color.paint(format!("{}", disc_net_difficulty_fmt))
                 ).as_str(),
             );
         } else {
@@ -1407,6 +1421,7 @@ fn get_chain_from_index(index: u8) -> PocChain {
         is_bhd: None,
         is_lhd: None,
         is_aeth: None,
+        is_disc: None,
         is_boomcoin: None,
         is_pool: None,
         is_hpool: None,
