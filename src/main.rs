@@ -66,6 +66,7 @@ lazy_static! {
     static ref HDPOOL_SUBMIT_NONCE_SENDER_LHD: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     static ref HDPOOL_SUBMIT_NONCE_SENDER_AETH: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     static ref HDPOOL_SUBMIT_NONCE_SENDER_DISC: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
+    static ref HDPOOL_SUBMIT_NONCE_SENDER_BURST: Arc<Mutex<Option<crossbeam::channel::Sender<HDPoolSubmitNonceInfo>>>> = Arc::new(Mutex::new(None));
     // Key = block height, Value = tuple (account_id, best_deadline)
     static ref BEST_DEADLINES: Arc<Mutex<HashMap<u32, Vec<(u64, u64)>>>> = {
         let best_deadlines = HashMap::new();
@@ -230,14 +231,22 @@ fn main() {
         let mut invalid_url_warnings = String::from("");
         for inner in &crate::CONF.poc_chains {
             for chain in inner {
+                let chain_is_pool = 
+                    chain.is_pool.unwrap_or_default() ||
+                    chain.is_hdpool.unwrap_or_default() ||
+                    chain.is_hdpool_eco.unwrap_or_default() ||
+                    chain.is_hpool.unwrap_or_default();
                 // check for configured passphrases which will not be used
                 if chain.numeric_id_to_passphrase.is_some()
-                    && (chain.is_pool.unwrap_or_default()
+                    &&
+                    (
+                        chain_is_pool
                         || chain.is_bhd.unwrap_or_default()
                         || chain.is_lhd.unwrap_or_default()
                         || chain.is_aeth.unwrap_or_default()
                         || chain.is_disc.unwrap_or_default()
-                        || !chain.enabled.unwrap_or(true))
+                        || !chain.enabled.unwrap_or(true)
+                    )
                 {
                     if unused_passphrase_warnings.len() > 0 {
                         unused_passphrase_warnings.push_str("\n");
@@ -299,6 +308,53 @@ fn main() {
                     if !((chain.is_hdpool.unwrap_or_default() || chain.is_hdpool_eco.unwrap_or_default()) && chain.account_key.is_some()) && chain.url.clone().len() == 0 {
                         invalid_url_warnings.push_str(format!("    Chain \"{}\" has no URL set when one is required! If you are trying to use HDPool direct mining, ensure your config names are correct, as they are CaSe SeNsItIvE!\n", &*chain.name).as_str());
                     }
+                    // check if chain has multiple currencies set
+                    // doing this the long-winded way for now, need to research using XOR checks in rust...
+                    let bhd = chain.is_bhd.unwrap_or_default();
+                    let lhd = chain.is_lhd.unwrap_or_default();
+                    let burst = chain.is_burst.unwrap_or_default();
+                    let disc = chain.is_disc.unwrap_or_default();
+                    let aeth = chain.is_aeth.unwrap_or_default();
+                    let boom = chain.is_boomcoin.unwrap_or_default();
+                    let mut chain_currency_set = false;
+                    let mut multiple_chain_currencies = false;
+                    if bhd { chain_currency_set = true; }
+                    if lhd && !chain_currency_set { 
+                        chain_currency_set = true;
+                    } else if lhd && chain_currency_set {
+                        multiple_chain_currencies = true;
+                    }
+                    if burst && !chain_currency_set {
+                        chain_currency_set = true;
+                    } else if burst && chain_currency_set {
+                        multiple_chain_currencies = true;
+                    }
+                    if disc && !chain_currency_set {
+                        chain_currency_set = true;
+                    } else if disc && chain_currency_set {
+                        multiple_chain_currencies = true;
+                    }
+                    if aeth && !chain_currency_set {
+                        chain_currency_set = true;
+                    } else if aeth && chain_currency_set {
+                        multiple_chain_currencies = true;
+                    }
+                    if boom && !chain_currency_set {
+                        // no point assigning this unless another currency is added after this check... chain_currency_set = true;
+                    } else if boom && chain_currency_set {
+                        multiple_chain_currencies = true;
+                    }
+                    if multiple_chain_currencies {
+                        error!("Chain \"{}\" has multiple currencies set, you can only choose one per chain!", &*chain.name);
+                        println!("\n  {}", Colour::Red.underline().paint(format!(r#"FATAL ERROR: The chain "{}" has multiple currencies set, you can only choose one per chain!"#, &*chain.name)));
+
+                        println!("\n  {}", Colour::Red.underline().paint("Execution completed. Press enter to exit."));
+
+                        let mut blah = String::new();
+                        std::io::stdin().read_line(&mut blah).expect("FAIL");
+                        exit(0);
+                    }
+
                     // check if both payout address and account key are set
                     if chain.account_key.is_some() && chain.foxypool_payout_address.is_some() {
                         error!(r#"The chain "{}" has both an account key and payout address defined. If mining to foxy pool, only set Payout Address! If mining to HDPool / HPool / BPool, only set Account Key!"#, &*chain.name);
@@ -1422,6 +1478,7 @@ fn get_chain_from_index(index: u8) -> PocChain {
         is_lhd: None,
         is_aeth: None,
         is_disc: None,
+        is_burst: None,
         is_boomcoin: None,
         is_pool: None,
         is_hpool: None,

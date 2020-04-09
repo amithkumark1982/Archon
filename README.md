@@ -328,6 +328,9 @@ If you need more control over your chains, you can add any of these parameters t
 - `isDisc` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is for mining Diskcoin/DISC.
+- `isBurst` *`Boolean`*
+  - Optional. Default = false
+  - Set to true if the chain is for mining Burstcoin/BURST **(required if mining Burst on HDPool)**.
 - `isPool` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is mining via a pool. *Not required if any of `isHpool`, `isHdpool` or `isHdpoolEco` are set to `true`.*

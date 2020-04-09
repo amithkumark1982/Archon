@@ -37,7 +37,8 @@ enum HdPoolCoin {
     BHD,
     LHD,
     AETH,
-    DISC
+    DISC,
+    BURST
 }
 
 fn create_chain_nonce_submission_client(chain_index: u8) {
@@ -147,6 +148,7 @@ fn coin_to_string(coin: &HdPoolCoin) -> String {
         HdPoolCoin::LHD => String::from("LHD"),
         HdPoolCoin::AETH => String::from("AETH"),
         HdPoolCoin::DISC => String::from("DISC"),
+        HdPoolCoin::BURST => String::from("BRS"),
         _ => String::from("BHD")
     }
 }
@@ -166,6 +168,8 @@ fn thread_handle_hdpool_nonce_submissions(
         coin = HdPoolCoin::AETH;
     } else if chain.is_disc.unwrap_or_default() {
         coin = HdPoolCoin::DISC;
+    } else if chain.is_burst.unwrap_or_default() {
+        coin = HdPoolCoin::BURST;
     }
     loop {
         let ks = match ks_rx.try_recv() {
@@ -250,6 +254,8 @@ fn thread_hdpool_websocket(
             coin = HdPoolCoin::AETH;
         } else if chain.is_disc.unwrap_or_default() {
             coin = HdPoolCoin::DISC;
+        } else if chain.is_burst.unwrap_or_default() {
+            coin = HdPoolCoin::BURST;
         }
         let mut miner_name = match chain.miner_name.clone() {
             Some(miner_name) => {
@@ -327,6 +333,9 @@ fn thread_hdpool_websocket(
                             r#"{"cmd":"poolmgr.heartbeat","mark":"disc"}"# => {
                                 trace!("DISC Heartbeat acknowledged.");
                             },
+                            r#"{"cmd":"poolmgr.heartbeat","mark":"brs"}"# => {
+                                trace!("BURST Heartbeat acknowledged.");
+                            },
                             _ => {
                                 debug!("HDPool WebSocket: Received:\n    {}", message);
                                 if coin == HdPoolCoin::LHD && (
@@ -372,6 +381,21 @@ fn thread_hdpool_websocket(
                                         }
                                         Err(why) => {
                                             warn!("HDP-WS: Couldn't send DISC mining info through channel: {}", why);
+                                        }
+                                    }
+                                } else if coin == HdPoolCoin::BURST && (
+                                    message_str.to_lowercase().starts_with(r#"{"cmd":"mining_info","mark":"brs","para":"#,) ||
+                                    message_str.to_lowercase().starts_with(r#"{"cmd":"poolmgr.mining_info","mark":"brs","para":"#)
+                                ) {
+                                    let parsed_message_str: serde_json::Value = serde_json::from_str(&message_str).unwrap();
+                                    let mining_info = parsed_message_str["para"].to_string().clone();
+                                    debug!("HDPool WebSocket: NEW BURST BLOCK: {}", mining_info);
+                                    match mining_info_sender.send(mining_info) {
+                                        Ok(_) => {
+                                            debug!("Sent BURST mining info through channel successfully.");
+                                        }
+                                        Err(why) => {
+                                            warn!("HDP-WS: Couldn't send BURST mining info through channel: {}", why);
                                         }
                                     }
                                 } else if coin == HdPoolCoin::BHD && (
@@ -469,6 +493,9 @@ fn thread_get_mining_info(
                 thread_hdpool_websocket(chain_copy, hdpool_mining_info_sender.clone(), hdpool_nonce_submission_receiver);
             } else if chain_copy.is_disc.unwrap_or_default() {
                 *crate::HDPOOL_SUBMIT_NONCE_SENDER_DISC.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
+                thread_hdpool_websocket(chain_copy, hdpool_mining_info_sender.clone(), hdpool_nonce_submission_receiver);
+            } else if chain_copy.is_burst.unwrap_or_default() {
+                *crate::HDPOOL_SUBMIT_NONCE_SENDER_BURST.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
                 thread_hdpool_websocket(chain_copy, hdpool_mining_info_sender.clone(), hdpool_nonce_submission_receiver);
             } else {
                 *crate::HDPOOL_SUBMIT_NONCE_SENDER_BHD.lock().unwrap() = Some(hdpool_nonce_submission_sender.clone());
@@ -1323,14 +1350,19 @@ pub fn process_nonce_submission(
                 }
                 let mut passphrase_str = String::from("");
                 // if solo mining burst, look for a passphrase from config for this account id
-                if !current_chain.is_hpool.unwrap_or_default()
-                    && !current_chain.is_hdpool.unwrap_or_default()
-                    && !current_chain.is_hdpool_eco.unwrap_or_default()
-                    && !current_chain.is_pool.unwrap_or_default()
-                    && !current_chain.is_bhd.unwrap_or_default()
-                    && !current_chain.is_lhd.unwrap_or_default()
-                    && !current_chain.is_aeth.unwrap_or_default()
-                    && !current_chain.is_disc.unwrap_or_default()
+                let chain_is_pool = 
+                    current_chain.is_pool.unwrap_or_default() ||
+                    current_chain.is_hdpool.unwrap_or_default() ||
+                    current_chain.is_hdpool_eco.unwrap_or_default() ||
+                    current_chain.is_hpool.unwrap_or_default();
+                if (!chain_is_pool && current_chain.is_burst.unwrap_or_default())
+                    || (
+                        !chain_is_pool
+                        && !current_chain.is_bhd.unwrap_or_default()
+                        && !current_chain.is_lhd.unwrap_or_default()
+                        && !current_chain.is_aeth.unwrap_or_default()
+                        && !current_chain.is_disc.unwrap_or_default()
+                    )
                 {
                     let mut passphrase_set = false;
                     match current_chain.clone().numeric_id_to_passphrase {
@@ -1374,6 +1406,8 @@ pub fn process_nonce_submission(
                                     coin = HdPoolCoin::AETH;
                                 } else if current_chain.is_disc.unwrap_or_default() {
                                     coin = HdPoolCoin::DISC;
+                                } else if current_chain.is_burst.unwrap_or_default() {
+                                    coin = HdPoolCoin::BURST;
                                 }
                                 // get sender
                                 let sender = match coin {
@@ -1381,6 +1415,7 @@ pub fn process_nonce_submission(
                                     HdPoolCoin::LHD => crate::HDPOOL_SUBMIT_NONCE_SENDER_LHD.lock().unwrap(),
                                     HdPoolCoin::AETH => crate::HDPOOL_SUBMIT_NONCE_SENDER_AETH.lock().unwrap(),
                                     HdPoolCoin::DISC => crate::HDPOOL_SUBMIT_NONCE_SENDER_DISC.lock().unwrap(),
+                                    HdPoolCoin::BURST => crate::HDPOOL_SUBMIT_NONCE_SENDER_BURST.lock().unwrap(),
                                 };
                                 if sender.is_some() {
                                     let sender = sender.clone().unwrap();
@@ -1418,14 +1453,16 @@ pub fn process_nonce_submission(
                             } else { // not hdpool direct
                                 let mut url = String::from(&*current_chain.url);
                                 // check if NOT solo mining burst
-                                if current_chain.is_hdpool.unwrap_or_default()
-                                    || current_chain.is_hdpool_eco.unwrap_or_default()
-                                    || current_chain.is_hpool.unwrap_or_default()
+                                let chain_is_pool = 
+                                    current_chain.is_pool.unwrap_or_default() ||
+                                    current_chain.is_hdpool.unwrap_or_default() ||
+                                    current_chain.is_hdpool_eco.unwrap_or_default() ||
+                                    current_chain.is_hpool.unwrap_or_default();
+                                if chain_is_pool
                                     || current_chain.is_bhd.unwrap_or_default()
                                     || current_chain.is_lhd.unwrap_or_default()
                                     || current_chain.is_aeth.unwrap_or_default()
-                                    || current_chain.is_disc.unwrap_or_default()
-                                    || current_chain.is_pool.unwrap_or_default() {
+                                    || current_chain.is_disc.unwrap_or_default() {
                                     if current_chain.is_boomcoin.unwrap_or(false) {
                                         url.push_str(format!("/boom?requestType=submitNonce&blockheight={}&accountId={}&nonce={}&deadline={}",
                                     height, account_id, nonce, unadjusted_deadline).as_str());
@@ -1607,10 +1644,12 @@ pub fn process_nonce_submission(
                 return resp.to_json();
             }
             _ => {
-                if !current_chain.is_hdpool.unwrap_or_default()
-                    && !current_chain.is_hdpool_eco.unwrap_or_default()
-                    && !current_chain.is_hpool.unwrap_or_default()
-                    && !current_chain.is_pool.unwrap_or_default()
+                let chain_is_pool = 
+                    current_chain.is_pool.unwrap_or_default() ||
+                    current_chain.is_hdpool.unwrap_or_default() ||
+                    current_chain.is_hdpool_eco.unwrap_or_default() ||
+                    current_chain.is_hpool.unwrap_or_default();
+                if !chain_is_pool
                     && !current_chain.is_lhd.unwrap_or_default()
                     && !current_chain.is_aeth.unwrap_or_default()
                     && !current_chain.is_disc.unwrap_or_default()
