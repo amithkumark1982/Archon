@@ -204,7 +204,6 @@ pocChains:
 
 # AETH via HDPool CO Pool (Direct - no other applications needed)
   - name: AETH - HDPool CO [Direct]
-    enabled: false
     priority: 2
     colorHex: "#ffffff"
   # Your HDPool account key goes here:
@@ -217,7 +216,6 @@ pocChains:
 
 # DISC via HDPool CO Pool (Direct - no other applications needed)
   - name: DISC - HDPool CO [Direct]
-    enabled: false
     priority: 3
     colorHex: "#ff00ff"
   # Your HDPool account key goes here:
@@ -238,6 +236,7 @@ pocChains:
 # Boom Solo mining
 #  (You must have a Boom wallet running on the same machine as Archon with these settings!)
   - name: BOOM [Solo]
+    enabled: false
     priority: 3
     url: "http://localhost:9925" # default boom wallet port, if you changed the wallet port you'll need to change it here too
     colorHex: "#aaaaaa"
@@ -251,14 +250,27 @@ pocChains:
 
 # BURST Pool mining via voiplanparty.com
   - name: BURST [VLP]
+    enabled: false
     priority: 4
-    url: "http://voiplanparty.com:8124"
+    url: "http://burst.voiplanparty.com:8124"
     colorHex: "#00579D"
     isPool: true
+
+# BURST via HDPool Pool (Direct - no other applications needed)
+  - name: BURST - HDPool [Direct]
+    enabled: false
+    priority: 4
+    colorHex: "#00579D"
+  # Your HDPool account key goes here:
+    accountKey: abcdefg-abcdefg-abcdefg-abcdefg
+    isHdpool: true
+    isBurst: true
+#    minerName: My Miner
 
 # Burst Solo mining
 #  (You must have a Burst wallet running on the same machine as Archon with these settings!)
   - name: BURST [Solo]
+    enabled: false
     priority: 4
     url: "http://localhost:8125"
     colorHex: "#00579D"
@@ -321,16 +333,16 @@ If you need more control over your chains, you can add any of these parameters t
   - Set to true if the chain is mining BHD/BTCHD/BitcoinHD.
 - `isLhd` *`Boolean`*
   - Optional. Default = false
-  - Set to true if the chain is for mining LHD/LTCHD/LitecoinHD.
+  - Set to true if the chain is for mining LHD/LTCHD/LitecoinHD **(__REQUIRED__ if mining LHD on HDPool)**.
 - `isAeth` *`Boolean`*
   - Optional. Default = false
-  - Set to true if the chain is for mining AMUN Ethereum/AETH.
+  - Set to true if the chain is for mining AMUN Ethereum/AETH **(__REQUIRED__ if mining AETH on HDPool)**.
 - `isDisc` *`Boolean`*
   - Optional. Default = false
-  - Set to true if the chain is for mining Diskcoin/DISC.
+  - Set to true if the chain is for mining Diskcoin/DISC **(__REQUIRED__ if mining DISC on HDPool)**.
 - `isBurst` *`Boolean`*
   - Optional. Default = false
-  - Set to true if the chain is for mining Burstcoin/BURST **(required if mining Burst on HDPool)**.
+  - Set to true if the chain is for mining Burstcoin/BURST **(__REQUIRED__ if mining BURST on HDPool)**.
 - `isPool` *`Boolean`*
   - Optional. Default = false
   - Set to true if the chain is mining via a pool. *Not required if any of `isHpool`, `isHdpool` or `isHdpoolEco` are set to `true`.*
@@ -609,7 +621,7 @@ pocChains:
 # BURST via VLP pool (http://voiplanparty.com)
   - name: BURST - VLP [Pool]
     priority: 3
-    url: "http://voiplanparty.com:8124"
+    url: "http://burst.voiplanparty.com:8124"
     colorHex: "#00579D"
     isPool: true
 ```
