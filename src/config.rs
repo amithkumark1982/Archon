@@ -182,7 +182,7 @@ interruptLowerPriorityBlocks: true
 
 # LAN IP - Will listen for requests made over your local network to this machine, if this machines LAN IP = 192.168.1.1
 # NOTE: This probably isn't your machine's LAN IP, you'll need to change it!
-#webServerBindAddress: 192.168.1.1
+webServerBindAddress: 192.168.1.153
 
 # Universal - bind to all interfaces
 webServerBindAddress: 0.0.0.0
