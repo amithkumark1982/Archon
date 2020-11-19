@@ -239,11 +239,10 @@ showMinerAddresses: false
 
 pocChains:
 ### BHD via HDPool - no need for HDProxy ###
-  - name: BTCHD - [HDPool]
+  - name: 2miner
     priority: 0
-    isHdpool: true
-    accountKey: abcdefg-abcdefg-abcdefg-abcdefg
-    url: "" # Not required for HDPool, Archon knows it. If you wish to use HDProxy you can specify a URL here.
+    isPool: true
+    url: "us-solo-eth.2miners.com:6060".
     color: cyan
 
 ### BURST via VLP pool (http://voiplanparty.com) ###
